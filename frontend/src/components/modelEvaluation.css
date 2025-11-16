@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+div.evaluation-panel,
+section.evaluation-panel {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  color: #e2e8f0;
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.55);
+}
+
+.evaluation-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.evaluation-panel h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
+  font-weight: 600;
+}
+
+.evaluation-panel p {
+  margin: 0.25rem 0 0;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.model-reason {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(56, 189, 248, 0.25));
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #cffafe;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  max-width: 320px;
+  font-size: 0.95rem;
+}
+
+.evaluation-alert {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  color: #fecaca;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.5rem;
+}
+
+.metrics-grid table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.metrics-grid thead {
+  background: rgba(30, 64, 175, 0.45);
+}
+
+.metrics-grid th,
+.metrics-grid td {
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.metrics-grid tbody tr:nth-child(odd) {
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.metrics-grid tbody tr:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.horizon-summary {
+  background: rgba(15, 23, 42, 0.75);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.horizon-summary h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.horizon-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.chart-card {
+  background: rgba(15, 23, 42, 0.75);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+}
+
+.chart-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.evaluation-notes {
+  background: rgba(30, 64, 175, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 16px;
+  padding: 1.4rem 1.6rem;
+}
+
+.evaluation-notes h3 {
+  margin: 0 0 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .evaluation-panel header {
+    flex-direction: column;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}

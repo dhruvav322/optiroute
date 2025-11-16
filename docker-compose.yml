@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: optiroute-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+    container_name: optiroute-backend
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: optiroute
+      MODEL_PATH: /models/model.pkl
+      MODEL_DIR: /models
+      SECRET_KEY: change-me
+    volumes:
+      - backend-models:/models
+      - backend-uploads:/storage/uploads
+    depends_on:
+      - mongo
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: optiroute-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:4173"
+
+volumes:
+  mongo-data:
+  backend-models:
+  backend-uploads:

@@ -1,0 +1,110 @@
+.feature-panel {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  padding: 1.75rem;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.45);
+}
+
+.feature-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.feature-panel h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+}
+
+.feature-panel p {
+  margin: 0.25rem 0 0;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.panel-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+}
+
+.panel-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.insight-text {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.heatmap-container {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.heatmap-container table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.heatmap-container th,
+.heatmap-container td {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.8rem;
+  text-align: center;
+  color: #e2e8f0;
+}
+
+.outlier-summary {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.outlier-summary span {
+  display: block;
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.outlier-summary strong {
+  font-size: 1rem;
+}
+
+.feature-footer {
+  background: rgba(30, 64, 175, 0.2);
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 1.4rem 1.6rem;
+}
+
+.feature-footer h3 {
+  margin: 0 0 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .feature-panel header {
+    flex-direction: column;
+  }
+}
