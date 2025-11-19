@@ -140,7 +140,7 @@ def run_simulation(
 @router.post(
     "/model/retrain",
     response_model=ModelRetrainResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Retrain model with optional outlier handling",
 )
 def retrain_model(
@@ -384,8 +384,12 @@ async def upload_data(
             detail="Uploaded file is empty.",
         )
 
+    # Determine configured max file size (fallback to safe default 10 MB)
+    default_max_mb = 10
+    max_file_size_mb = getattr(settings, "max_file_size_mb", default_max_mb)
+
     # Security: Validate file size
-    validate_file_size(content, settings.max_file_size_mb)
+    validate_file_size(content, max_file_size_mb)
 
     # Security: Validate file type (must be CSV)
     if not file.filename or not file.filename.lower().endswith('.csv'):

@@ -34,6 +34,7 @@ def override_settings(monkeypatch, tmp_path):
         model_path=model_dir / "model.pkl",
         uploads_dir=uploads_dir,
         secret_key="test-secret",
+        max_file_size_mb=10,  # Include max_file_size_mb for upload validation
     )
 
     monkeypatch.setattr(config, "get_settings", lambda: settings)
