@@ -14,7 +14,6 @@ import {
 } from 'recharts';
 
 import { getFeatureAnalysis } from '../api/client.js';
-import './featureInsights.css';
 
 const DEFAULT_ANALYSIS = {
   analyzed_at: '',

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from bson import ObjectId
@@ -18,15 +18,16 @@ class ExperimentTrackerConfig:
 
 
 class ExperimentTracker:
-    def __init__(self, db, config: ExperimentTrackerConfig | None = None) -> None:
+    def __init__(self, db, client_id: str = "default", config: ExperimentTrackerConfig | None = None) -> None:
         self.db = db
+        self.client_id = client_id  # Store client_id for filtering
         self.config = config or ExperimentTrackerConfig()
         self.collection = self.db[self.config.collection_name]
 
     def log_experiment(self, payload: Dict[str, Any]) -> str:
-        created_at = payload.get("created_at", datetime.utcnow())
+        created_at = payload.get("created_at", datetime.now(timezone.utc))
         if created_at is None:
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
         if isinstance(created_at, str):
             try:
                 created_at = datetime.fromisoformat(created_at)
@@ -38,6 +39,7 @@ class ExperimentTracker:
 
         document = {
             **payload,
+            "client_id": self.client_id,  # Always store client_id from authenticated user
             "created_at": created_at,
         }
         if "_id" in document:
@@ -47,8 +49,11 @@ class ExperimentTracker:
 
     def history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         limit = limit or self.config.history_limit
+        # Filter by client_id - never return other users' experiments
         cursor = (
-            self.collection.find().sort("created_at", -1).limit(max(1, limit))
+            self.collection.find({"client_id": self.client_id})
+            .sort("created_at", -1)
+            .limit(max(1, limit))
         )
         return [self._serialize(doc) for doc in cursor]
 
@@ -56,7 +61,11 @@ class ExperimentTracker:
         object_ids = self._parse_object_ids(ids)
         if not object_ids:
             return []
-        cursor = self.collection.find({"_id": {"$in": object_ids}})
+        # Filter by client_id AND IDs - only compare experiments belonging to this user
+        cursor = self.collection.find({
+            "_id": {"$in": object_ids},
+            "client_id": self.client_id  # CRITICAL: Filter by authenticated user
+        })
         documents = [self._serialize(doc) for doc in cursor]
         if len(documents) != len(object_ids):
             missing = set(object_ids) - {
@@ -70,7 +79,8 @@ class ExperimentTracker:
 
     def best(self, metric: Optional[str] = None) -> Optional[Dict[str, Any]]:
         metric = metric or self.config.default_sort_metric
-        cursor = self.collection.find().sort(
+        # Filter by client_id - only return best experiment for this user
+        cursor = self.collection.find({"client_id": self.client_id}).sort(
             [(f"metrics.validation.{metric}", 1), (f"metrics.train.{metric}", 1)]
         )
         doc = next(cursor, None)

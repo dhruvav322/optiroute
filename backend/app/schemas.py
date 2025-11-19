@@ -26,7 +26,7 @@ class ForecastResponse(BaseModel):
 
 
 class SimulationRequest(BaseModel):
-    client_id: str
+    # client_id removed - now extracted from JWT token for security
     holding_cost_per_unit_per_year: float
     order_cost: float
     unit_cost: float
@@ -63,7 +63,7 @@ class OutlierStatsResponse(BaseModel):
 
 
 class ModelRetrainRequest(BaseModel):
-    client_id: str
+    # client_id removed - now extracted from JWT token for security
     train_from_uploaded_data: bool = False
     outlier_handling: Literal["keep", "winsorize", "remove"] = "winsorize"
 
@@ -355,6 +355,7 @@ class RouteOptimizationRequest(BaseModel):
     depot_index: int = 0
     problem_type: Literal["tsp", "vrp"] = "tsp"
     vehicles: Optional[List[VehicleInput]] = None
+    return_to_depot: bool = True  # If True, vehicle returns to depot. If False, route ends at last stop.
 
 
 class RouteStop(BaseModel):

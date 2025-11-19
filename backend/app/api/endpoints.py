@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 from pandas.errors import EmptyDataError, ParserError
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from ..core.config import get_settings
+from ..core.security import get_current_user, TokenData
 from ..db import get_mongo
 from ..schemas import (
     ForecastResponse,
@@ -64,8 +66,12 @@ def get_db():
     return get_mongo().db
 
 
-def get_experiment_tracker(db=Depends(get_db)):
-    return ExperimentTracker(db)
+def get_experiment_tracker(
+    current_user: TokenData = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    # Extract client_id from authenticated user token - never trust client input
+    return ExperimentTracker(db, client_id=current_user.client_id)
 
 
 @router.get(
@@ -75,10 +81,11 @@ def get_experiment_tracker(db=Depends(get_db)):
 )
 def get_current_forecast(
     days: int = Query(30, ge=1, le=180),
-    client_id: str = Query("default", description="Client ID"),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> ForecastResponse:
-    service = ForecastService(client_id)
+    # Extract client_id from authenticated user token - never trust client input
+    service = ForecastService(current_user.client_id)
     forecast_df = service.forecast(days)
 
     points = [
@@ -97,9 +104,12 @@ def get_current_forecast(
 )
 def run_simulation(
     payload: SimulationRequest,
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> SimulationResponse:
-    forecast_service = ForecastService(payload.client_id)
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
+    forecast_service = ForecastService(client_id)
     forecast_df = forecast_service.forecast(payload.forecast_days)
     forecast_values = forecast_df["yhat"].tolist()
 
@@ -116,9 +126,10 @@ def run_simulation(
 
     db.simulation_parameters.insert_one(
         {
+            "client_id": client_id,  # Store client_id from token
             "parameters": payload.dict(),
             "forecast_days": payload.forecast_days,
-            "saved_at": datetime.utcnow(),
+            "saved_at": datetime.now(timezone.utc),
             "result": result,
         }
     )
@@ -134,10 +145,12 @@ def run_simulation(
 )
 def retrain_model(
     request: ModelRetrainRequest,
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
     tracker: ExperimentTracker = Depends(get_experiment_tracker),
 ) -> ModelRetrainResponse:
-    client_id = request.client_id if hasattr(request, 'client_id') and request.client_id else 'default'
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
     record_count = db.historical_sales.count_documents({"client_id": client_id})
     if record_count == 0:
         raise HTTPException(
@@ -166,9 +179,10 @@ def retrain_model(
         }
         outlier_stats = retrain_output["outlier_stats"]
 
-        trained_at = datetime.utcnow()
+        trained_at = datetime.now(timezone.utc)
         metrics = training_result.get("metrics", {})
         model_doc = {
+            "client_id": client_id,  # Store client_id from authenticated user
             "model_path": str(forecast_service.model_path),
             "model_type": training_result.get("model_type", "unknown"),
             "train_metrics": metrics,
@@ -215,10 +229,11 @@ def retrain_model(
         logger.exception("Model retraining failed")
         db.model_parameters.insert_one(
             {
+                "client_id": client_id,  # Store client_id from authenticated user
                 "model_path": str(forecast_service.model_path),
                 "model_type": "unknown",
                 "train_metrics": {},
-                "trained_at": datetime.utcnow(),
+                "trained_at": datetime.now(timezone.utc),
                 "notes": f"Training failed: {exc}",
             }
         )
@@ -239,8 +254,12 @@ def retrain_model(
     response_model=InventorySummary,
     summary="Get dashboard inventory summary",
 )
-def inventory_summary(db=Depends(get_db)) -> InventorySummary:
-    service = InventoryService(db, "default")
+def inventory_summary(
+    current_user: TokenData = Depends(get_current_user),
+    db=Depends(get_db),
+) -> InventorySummary:
+    # Extract client_id from authenticated user token - never trust client input
+    service = InventoryService(db, current_user.client_id)
     return service.summary()
 
 
@@ -250,10 +269,11 @@ def inventory_summary(db=Depends(get_db)) -> InventorySummary:
     summary="Compare forecasting models across diagnostics",
 )
 def model_evaluation(
-    client_id: str = Query("default", description="Client ID"),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> ModelEvaluationResponse:
-    service = EvaluationService(db, client_id)
+    # Extract client_id from authenticated user token - never trust client input
+    service = EvaluationService(db, current_user.client_id)
     evaluation = service.evaluate()
     return ModelEvaluationResponse(**evaluation)
 
@@ -264,10 +284,11 @@ def model_evaluation(
     summary="Inspect engineered features, decomposition, and outliers",
 )
 def feature_analysis(
-    client_id: str = Query("default", description="Client ID"),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> FeatureAnalysisResponse:
-    service = FeatureEngineeringService(db, client_id)
+    # Extract client_id from authenticated user token - never trust client input
+    service = FeatureEngineeringService(db, current_user.client_id)
     result = service.analyze()
     return FeatureAnalysisResponse(**result)
 
@@ -347,10 +368,13 @@ def business_impact(
     summary="Upload historical sales CSV",
 )
 async def upload_data(
-    client_id: str = Form(...),
     file: UploadFile = File(...),
+    column_mapping: str = Form(None),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> UploadResponse:
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
     settings = get_settings()
     content = await file.read()
 
@@ -426,15 +450,58 @@ async def upload_data(
             detail=f"Failed to parse CSV file: {str(exc)}. Please ensure it's a valid CSV format.",
         ) from exc
 
-    required_columns = {"date", "quantity"}
-    normalized = {col.lower(): col for col in df.columns}
-    if not required_columns.issubset(normalized.keys()):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV must include 'date' and 'quantity' columns.",
-        )
+    # Apply column mapping if provided
+    mapping_dict = None
+    if column_mapping:
+        try:
+            mapping_dict = json.loads(column_mapping)
+            if not isinstance(mapping_dict, dict):
+                raise ValueError("column_mapping must be a JSON object")
+            
+            # Validate mapping contains required fields
+            if "date" not in mapping_dict or "quantity" not in mapping_dict:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="column_mapping must include 'date' and 'quantity' fields.",
+                )
+            
+            # Create reverse mapping: original_column -> standard_column
+            reverse_mapping = {}
+            for standard_col, original_col in mapping_dict.items():
+                if original_col not in df.columns:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Column '{original_col}' specified in mapping not found in CSV. Available columns: {', '.join(df.columns)}",
+                    )
+                reverse_mapping[original_col] = standard_col
+            
+            # Rename columns based on mapping
+            df.rename(columns=reverse_mapping, inplace=True)
+            
+            logger.info(f"Applied column mapping: {mapping_dict}")
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid JSON in column_mapping: {str(exc)}",
+            ) from exc
 
-    df.rename(columns={normalized["date"]: "date", normalized["quantity"]: "quantity"}, inplace=True)
+    # Check for required columns (after mapping)
+    required_columns = {"date", "quantity"}
+    if not required_columns.issubset(df.columns):
+        if mapping_dict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"After mapping, CSV must include 'date' and 'quantity' columns. Current columns: {', '.join(df.columns)}",
+            )
+        else:
+            # Fallback to case-insensitive matching if no mapping provided
+            normalized = {col.lower(): col for col in df.columns}
+            if not required_columns.issubset(normalized.keys()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="CSV must include 'date' and 'quantity' columns.",
+                )
+            df.rename(columns={normalized["date"]: "date", normalized["quantity"]: "quantity"}, inplace=True)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     if df["date"].isna().any():
         raise HTTPException(
@@ -453,18 +520,22 @@ async def upload_data(
 
     # Security: Sanitize filename to prevent path traversal
     safe_filename = sanitize_filename(file.filename or 'upload.csv')
-    upload_id = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    upload_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     upload_path = settings.uploads_dir / f"{upload_id}_{safe_filename}"
     with upload_path.open("wb") as fh:
         fh.write(content)
 
+    # Determine SKU column - use mapped 'sku' if available, otherwise default
+    sku_column = "sku" if "sku" in df.columns else None
+    
     records = [
         {
             "client_id": client_id,
             "date": row["date"].to_pydatetime(),
             "quantity": int(row["quantity"]),
+            "sku": str(row[sku_column]) if sku_column and pd.notna(row[sku_column]) else "default_item",
             "source_file": upload_path.name,
-            "uploaded_at": datetime.utcnow(),
+            "uploaded_at": datetime.now(timezone.utc),
         }
         for _, row in df.iterrows()
     ]
@@ -485,8 +556,16 @@ async def upload_data(
     response_model=ModelStatusResponse,
     summary="Retrieve latest model metadata",
 )
-def model_status(db=Depends(get_db)) -> ModelStatusResponse:
-    latest = db.model_parameters.find_one(sort=[("trained_at", -1)])
+def model_status(
+    current_user: TokenData = Depends(get_current_user),
+    db=Depends(get_db),
+) -> ModelStatusResponse:
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
+    latest = db.model_parameters.find_one(
+        {"client_id": client_id},  # Filter by authenticated user's client_id
+        sort=[("trained_at", -1)]
+    )
     if not latest:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -499,7 +578,7 @@ def model_status(db=Depends(get_db)) -> ModelStatusResponse:
     elif trained_at:
         trained_at_str = str(trained_at)
     else:
-        trained_at_str = datetime.utcnow().isoformat()
+        trained_at_str = datetime.now(timezone.utc).isoformat()
 
     return ModelStatusResponse(
         model_path=latest.get("model_path", ""),
@@ -548,8 +627,11 @@ def optimize_routes(
             )
         )
     
+    # Extract return_to_depot from payload (default True for backward compatibility)
+    return_to_depot = getattr(payload, 'return_to_depot', True)
+    
     if payload.problem_type == "tsp":
-        result = service.solve_tsp(locations, payload.depot_index)
+        result = service.solve_tsp(locations, payload.depot_index, return_to_depot=return_to_depot)
         return RouteOptimizationResponse(
             problem_type="tsp",
             tsp_result=TSPResponse(**result),
@@ -582,7 +664,7 @@ def optimize_routes(
                     cost_per_km=v.cost_per_km
                 )
             )
-        result = service.solve_vrp(locations, vehicles, payload.depot_index)
+        result = service.solve_vrp(locations, vehicles, payload.depot_index, return_to_depot=return_to_depot)
         return RouteOptimizationResponse(
             problem_type="vrp",
             tsp_result=None,
@@ -597,7 +679,7 @@ def optimize_routes(
 )
 def create_api_key(
     name: str,
-    client_id: str = "default",
+    current_user: TokenData = Depends(get_current_user),
     expires_days: int = Query(None, ge=1, le=365),
     scopes: list[str] = Query(default=[]),
     db=Depends(get_db),
@@ -605,6 +687,8 @@ def create_api_key(
     """Create a new API key for external integrations."""
     from ..core.api_keys import APIKeyManager
     
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
     manager = APIKeyManager(db)
     return manager.create_api_key(
         name=name,
@@ -619,12 +703,14 @@ def create_api_key(
     summary="List all API keys for a client",
 )
 def list_api_keys(
-    client_id: str = Query("default"),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> dict:
     """List all API keys for a client."""
     from ..core.api_keys import APIKeyManager
     
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
     manager = APIKeyManager(db)
     keys = manager.list_api_keys(client_id)
     return {"api_keys": keys}
@@ -636,12 +722,15 @@ def list_api_keys(
 )
 def revoke_api_key(
     key_id: str,
-    client_id: str = Query("default"),
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> dict:
     """Revoke an API key."""
     from ..core.api_keys import APIKeyManager
     from bson import ObjectId
+    
+    # Extract client_id from authenticated user token - never trust client input
+    client_id = current_user.client_id
     
     try:
         manager = APIKeyManager(db)

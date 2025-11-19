@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
+import { formatDate } from '../utils/formatters.js';
 
 import {
   getExperimentsHistory,
   getExperimentsBest,
   getExperimentsCompare,
 } from '../api/client.js';
-import './experimentHistory.css';
 
 const DEFAULT_STATE = {
   experiments: [],
@@ -148,7 +148,7 @@ function ExperimentHistory({ fallbackData = null } = {}) {
                     ? `${experiment.data_profile.date_range[0]} → ${experiment.data_profile.date_range[1]}`
                     : '—'}
                 </td>
-                <td>{new Date(experiment.created_at).toLocaleString()}</td>
+                <td>{formatDate(experiment.created_at)}</td>
               </tr>
             ))}
           </tbody>

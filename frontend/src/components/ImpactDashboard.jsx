@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { calculateBusinessImpact } from '../api/client.js';
-import './impactDashboard.css';
 
 const DEFAULT_BASELINE = {
   annual_demand: 12000,

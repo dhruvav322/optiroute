@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
@@ -199,4 +199,4 @@ class ForecastService:
         error = actual_arr - pred_arr
         mae = float(np.mean(np.abs(error))) if error.size else 0.0
         rmse = float(np.sqrt(np.mean(np.square(error)))) if error.size else 0.0
-        return {"mae": mae, "rmse": rmse, "generated_at": datetime.utcnow().isoformat()}
+        return {"mae": mae, "rmse": rmse, "generated_at": datetime.now(timezone.utc).isoformat()}

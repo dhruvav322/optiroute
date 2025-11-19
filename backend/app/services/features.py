@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import numpy as np
@@ -55,7 +55,7 @@ class FeatureEngineeringService:
         feature_importance = self._feature_importances(engineered)
         correlation_matrix = self._correlation_matrix(engineered)
 
-        analyzed_at = datetime.utcnow()
+        analyzed_at = datetime.now(timezone.utc)
         doc = {
             "analyzed_at": analyzed_at,
             "rows": len(frame),

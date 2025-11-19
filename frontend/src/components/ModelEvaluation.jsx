@@ -15,7 +15,6 @@ import {
 } from 'recharts';
 
 import { getModelEvaluation } from '../api/client.js';
-import './modelEvaluation.css';
 
 const DEFAULT_EVALUATION = {
   evaluated_at: '',

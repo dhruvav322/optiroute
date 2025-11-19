@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple
+from functools import lru_cache
+from typing import List, Dict, Any, Tuple, Optional
 
+import requests
 from fastapi import HTTPException, status
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,15 +37,84 @@ class Vehicle:
 class RouteOptimizationService:
     """Service for optimizing delivery routes using OR-Tools."""
 
-    def __init__(self):
-        self.earth_radius_km = 6371.0  # Earth's radius in kilometers
-
     def calculate_distance_matrix(
         self, locations: List[Location]
     ) -> List[List[int]]:
-        """Calculate distance matrix using Haversine formula.
+        """Calculate distance matrix using OSRM (Open Source Routing Machine) for real road distances.
+        
+        Falls back to Haversine (straight-line) if OSRM is unavailable.
         
         Returns distance matrix in meters (as integers for OR-Tools).
+        """
+        # Try OSRM first for real driving distances
+        try:
+            return self._get_road_distance_matrix(locations)
+        except Exception as e:
+            logger.warning(f"OSRM unavailable, falling back to Haversine: {e}")
+            return self._calculate_haversine_matrix(locations)
+
+    def _get_road_distance_matrix(self, locations: List[Location]) -> List[List[int]]:
+        """Get driving distance matrix from OSRM (Open Source Routing Machine).
+        
+        OSRM returns real road distances in meters, accounting for one-way streets,
+        bridges, traffic patterns, etc. This is critical for real-world route optimization.
+        
+        Uses public OSRM demo server. For production, deploy your own OSRM instance.
+        """
+        if len(locations) > 100:
+            # OSRM public API has limits, fall back for very large problems
+            logger.warning(f"Too many locations ({len(locations)}), using Haversine fallback")
+            return self._calculate_haversine_matrix(locations)
+
+        # Build coordinates string: "lon1,lat1;lon2,lat2;..."
+        # Note: OSRM expects longitude first, then latitude
+        coordinates = ";".join([
+            f"{loc.longitude},{loc.latitude}" 
+            for loc in locations
+        ])
+
+        # OSRM Table Service API - returns distance matrix for all pairs
+        # Public demo server (use your own Docker container for production)
+        url = f"http://router.project-osrm.org/table/v1/driving/{coordinates}"
+        params = {
+            "annotations": "distance",  # Request distances only (faster than duration+distance)
+            # Omitting sources/destinations means all-to-all distance matrix
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if "distances" not in data:
+                raise ValueError("OSRM response missing distances field")
+
+            # OSRM returns distances in meters as floats, convert to integers
+            # Handle None values (unreachable routes) by using a very large distance
+            matrix = []
+            for row in data["distances"]:
+                matrix.append([
+                    int(d) if d is not None else 999999999  # Unreachable = very large distance
+                    for d in row
+                ])
+
+            logger.info(f"Successfully fetched road distance matrix from OSRM ({len(locations)}x{len(locations)})")
+            return matrix
+
+        except requests.RequestException as e:
+            logger.warning(f"OSRM request failed: {e}")
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            logger.warning(f"OSRM response parsing failed: {e}")
+            raise
+
+    def _calculate_haversine_matrix(self, locations: List[Location]) -> List[List[int]]:
+        """Calculate distance matrix using Haversine formula (straight-line distances).
+        
+        This is a fallback when OSRM is unavailable. Haversine calculates "as the crow flies"
+        distances, which are always shorter than actual road distances.
+        
+        For production use, always prefer OSRM road distances.
         """
         n = len(locations)
         matrix = [[0] * n for _ in range(n)]
@@ -57,12 +131,19 @@ class RouteOptimizationService:
                     # Convert to meters and round to integer
                     matrix[i][j] = int(dist_km * 1000)
         
+        logger.info(f"Calculated Haversine distance matrix ({n}x{n})")
         return matrix
 
+    @staticmethod
+    @lru_cache(maxsize=10000)  # Cache up to 10,000 unique distance calculations
     def _haversine_distance(
-        self, lat1: float, lon1: float, lat2: float, lon2: float
+        lat1: float, lon1: float, lat2: float, lon2: float
     ) -> float:
-        """Calculate great-circle distance between two points using Haversine formula."""
+        """Calculate great-circle distance between two points using Haversine formula.
+        
+        Uses LRU cache for performance - repeated distance calculations are instant.
+        Cache size of 10,000 covers ~100 location problems (100x100 matrix).
+        """
         # Convert to radians
         lat1_rad = math.radians(lat1)
         lon1_rad = math.radians(lon1)
@@ -79,18 +160,20 @@ class RouteOptimizationService:
         )
         c = 2 * math.asin(math.sqrt(a))
         
-        return self.earth_radius_km * c
+        return 6371.0 * c  # Earth's radius in kilometers
 
     def solve_tsp(
         self,
         locations: List[Location],
-        depot_index: int = 0
+        depot_index: int = 0,
+        return_to_depot: bool = True
     ) -> Dict[str, Any]:
         """Solve Traveling Salesman Problem (single vehicle, all locations).
         
         Args:
             locations: List of locations to visit
             depot_index: Index of depot/starting location
+            return_to_depot: If True, vehicle must return to depot. If False, route ends at last stop.
             
         Returns:
             Dictionary with route, distance, and route details
@@ -105,6 +188,8 @@ class RouteOptimizationService:
         distance_matrix = self.calculate_distance_matrix(locations)
         
         # Create routing model
+        # Note: OR-Tools always returns to depot by default. For open TSP (return_to_depot=False),
+        # we'll handle this in route extraction by not adding the final depot node.
         manager = pywrapcp.RoutingIndexManager(
             len(locations), 1, depot_index
         )
@@ -153,10 +238,15 @@ class RouteOptimizationService:
                 previous_index, index, 0
             )
 
-        # Add depot at end to complete cycle
+        # Add depot at end only if return_to_depot is True
         final_node = manager.IndexToNode(index)
-        route.append(locations[final_node])
-        route_indices.append(final_node)
+        if return_to_depot:
+            route.append(locations[final_node])
+            route_indices.append(final_node)
+        else:
+            # For open TSP, the route ends at the last stop (driver can end shift there)
+            # The final distance is already included in total_distance
+            pass
 
         return {
             "route": [
@@ -171,15 +261,17 @@ class RouteOptimizationService:
             ],
             "total_distance_meters": total_distance,
             "total_distance_km": round(total_distance / 1000, 2),
-            "number_of_stops": len(route) - 1,  # Exclude return to depot
-            "route_indices": route_indices
+            "number_of_stops": len(route) - (1 if return_to_depot else 0),  # Exclude return to depot if applicable
+            "route_indices": route_indices,
+            "return_to_depot": return_to_depot
         }
 
     def solve_vrp(
         self,
         locations: List[Location],
         vehicles: List[Vehicle],
-        depot_index: int = 0
+        depot_index: int = 0,
+        return_to_depot: bool = True
     ) -> Dict[str, Any]:
         """Solve Vehicle Routing Problem (multiple vehicles with capacity).
         
@@ -187,6 +279,7 @@ class RouteOptimizationService:
             locations: List of locations (first is depot)
             vehicles: List of vehicles
             depot_index: Index of depot
+            return_to_depot: If True, vehicles must return to depot. If False, routes can end at last stop.
             
         Returns:
             Dictionary with routes for each vehicle, total distance, etc.
@@ -274,10 +367,14 @@ class RouteOptimizationService:
                     previous_index, index, vehicle_id
                 )
             
-            # Add depot at end
+            # Add depot at end only if return_to_depot is True
             final_node = manager.IndexToNode(index)
-            route.append(locations[final_node])
-            route_indices.append(final_node)
+            if return_to_depot:
+                route.append(locations[final_node])
+                route_indices.append(final_node)
+            else:
+                # For open VRP, routes end at last stop (driver can end shift there)
+                pass
             
             if len(route) > 2:  # Only include routes with actual stops
                 vehicle_routes.append({
@@ -295,7 +392,7 @@ class RouteOptimizationService:
                     ],
                     "distance_meters": vehicle_distance,
                     "distance_km": round(vehicle_distance / 1000, 2),
-                    "number_of_stops": len(route) - 2,  # Exclude depot start/end
+                    "number_of_stops": len(route) - (2 if return_to_depot else 1),  # Exclude depot start/end if applicable
                     "route_indices": route_indices
                 })
                 total_distance += vehicle_distance
@@ -305,6 +402,7 @@ class RouteOptimizationService:
             "total_distance_meters": total_distance,
             "total_distance_km": round(total_distance / 1000, 2),
             "vehicles_used": len(vehicle_routes),
-            "total_vehicles": len(vehicles)
+            "total_vehicles": len(vehicles),
+            "return_to_depot": return_to_depot
         }
 

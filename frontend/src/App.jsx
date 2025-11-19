@@ -1,24 +1,33 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Toaster, toast } from 'sonner';
+import NProgress from 'nprogress';
+import 'nprogress/nprogress.css';
 
-import Dashboard from './components/Dashboard.jsx';
-import SimulationCockpit from './components/SimulationCockpit.jsx';
-import CostChart from './components/CostChart.jsx';
-import MLOpsPanel from './components/MLOpsPanel.jsx';
-import ModelEvaluation from './components/ModelEvaluation.jsx';
-import FeatureInsights from './components/FeatureInsights.jsx';
-import RouteOptimizer from './components/RouteOptimizer.jsx';
+// Layouts
+import DashboardLayout from './layouts/DashboardLayout.jsx';
+import { RouteProgress } from './components/RouteProgress.jsx';
+import { GlobalHotkeys } from './components/GlobalHotkeys.jsx';
+import PageTransition from './components/PageTransition.jsx';
+
+// Pages
+import Overview from './pages/Overview.jsx';
+import Planning from './pages/Planning.jsx';
+import Forecast from './pages/Forecast.jsx';
+import Logistics from './pages/Logistics.jsx';
+import Settings from './pages/Settings.jsx';
+
+// API
 import {
   getForecast,
   getInventorySummary,
   getModelStatus,
   runSimulation,
+  login,
 } from './api/client.js';
-import './App.css';
 
 const INITIAL_SIM_PARAMS = {
-  client_id: 'default',
+  // client_id removed - now extracted from JWT token on backend
   holding_cost_per_unit_per_year: 2.5,
   order_cost: 50,
   unit_cost: 10,
@@ -40,40 +49,102 @@ function App() {
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
-      const summaryData = await getInventorySummary();
-      setInventorySummary(summaryData);
+      
+      // Load all data in parallel instead of sequentially (Waterfall → Parallel)
+      // This dramatically reduces initial load time
+      const [summaryResult, forecastResult, modelResult] = await Promise.allSettled([
+        getInventorySummary().catch(error => {
+          console.error('Failed to load inventory summary:', error);
+          throw error;
+        }),
+        getForecast().catch(error => {
+          // 404 is expected if no model exists yet - suppress console errors for this
+          if (error.status === 404) {
+            return null; // Silently return null for 404 (no model exists)
+          }
+          // Only log unexpected errors
+          console.error('Failed to load forecast data:', error.message);
+          return null;
+        }),
+        getModelStatus().catch(error => {
+          // 404 is expected if no model exists yet - suppress console errors for this
+          if (error.status === 404) {
+            return null; // Silently return null for 404 (no model exists)
+          }
+          // Only log unexpected errors
+          console.error('Failed to fetch model status:', error.message);
+          return null;
+        }),
+      ]);
 
-      try {
-        const forecastData = await getForecast();
-        setForecast(forecastData);
-      } catch (error) {
-        if (error.status === 404) {
-          setForecast(null);
+      // Process results
+      if (summaryResult.status === 'fulfilled') {
+        setInventorySummary(summaryResult.value);
         } else {
-          toast.error(error.message || 'Failed to load forecast data');
+        toast.error('Failed to load inventory summary', {
+          description: summaryResult.reason?.message || 'Unknown error occurred',
+        });
         }
+
+      if (forecastResult.status === 'fulfilled') {
+        setForecast(forecastResult.value);
       }
 
-      try {
-        const modelData = await getModelStatus();
+      if (modelResult.status === 'fulfilled') {
+        const modelData = modelResult.value;
+        if (modelData) {
         setModelStatus(modelData);
         setModelReady(true);
-      } catch (error) {
-        if (error.status !== 404) {
-          toast.error(error.message || 'Failed to fetch model status');
+        } else {
+          setModelStatus(null);
+          setModelReady(false);
+        }
+      } else {
+        // Only show error toast if it's not a 404 (expected when no model exists)
+        if (modelResult.reason?.status !== 404) {
+          toast.error('Failed to fetch model status', {
+            description: modelResult.reason?.message || 'Unknown error occurred',
+          });
         }
         setModelStatus(null);
         setModelReady(false);
       }
     } catch (error) {
-      toast.error(error.message || 'Failed to load initial data');
+      toast.error('Failed to load initial data', {
+        description: error.message || 'Unknown error occurred',
+      });
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Auto-login for development/testing
   useEffect(() => {
+    const initializeAuth = async () => {
+      // Check if we already have a token
+      const existingToken = localStorage.getItem('auth_token');
+      
+      if (!existingToken) {
+        // Auto-login with default credentials for development
+        // In production, users would log in through a login page
+        try {
+          await login('user_1', 'default', null);
+          toast.success('Authenticated', {
+            description: 'Logged in with default credentials',
+          });
+        } catch (error) {
+          console.error('Auto-login failed:', error);
+          toast.error('Authentication failed', {
+            description: 'Please log in manually',
+          });
+        }
+      }
+      
+      // Load data after authentication
     loadInitialData();
+    };
+    
+    initializeAuth();
   }, [loadInitialData]);
 
   const runSimulationWithParams = useCallback(
@@ -87,9 +158,11 @@ function App() {
         return result;
       } catch (error) {
         if (error.status === 404) {
-          toast.warn('Train the forecast model before running simulations.');
+          toast.warning('Train the forecast model before running simulations.');
         } else {
-          toast.error(error.message || 'Simulation run failed');
+          toast.error('Simulation run failed', {
+            description: error.message || 'Unknown error occurred',
+          });
         }
         throw error;
       } finally {
@@ -123,7 +196,9 @@ function App() {
         })
         .catch((error) => {
           if (error.status !== 404) {
-            toast.error(error.message || 'Failed to refresh model status');
+            toast.error('Failed to refresh model status', {
+              description: error.message || 'Unknown error occurred',
+            });
           }
         });
     }, 10000);
@@ -160,62 +235,83 @@ function App() {
   }, [simulation]);
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <h1>Optiroute — Supply Chain Optimization</h1>
-          <p className="subtitle">AI-powered demand forecasting, inventory optimization, and route planning for smarter supply chain decisions.</p>
-        </div>
-      </header>
-
-      <main className="app-content">
-        <section>
-          <Dashboard
-            summary={inventorySummary}
+    <BrowserRouter>
+      <RouteProgress />
+      <GlobalHotkeys onRunSimulation={() => runSimulationWithParams(simulationParams)} />
+      <DashboardLayout onRunSimulation={() => runSimulationWithParams(simulationParams)}>
+        <Routes>
+          {/* 1. Overview Page */}
+          <Route 
+            path="/" 
+            element={
+              <PageTransition>
+                <Overview 
+                  inventorySummary={inventorySummary}
             simulation={simulation}
             forecast={forecast}
-            loading={loading}
+                  onRunSimulation={() => runSimulationWithParams(simulationParams)}
+                  loading={loading || loadingSimulation}
           />
-        </section>
+              </PageTransition>
+            } 
+          />
 
-        <section className="grid-layout">
-          <div className="panel">
-            <SimulationCockpit
-              values={simulationParams}
-              onChange={onSliderChange}
-              isRunning={loadingSimulation}
+          {/* 2. Planning Page (Simulation + Cost) */}
+          <Route 
+            path="/planning" 
+            element={
+              <PageTransition>
+                <Planning 
+                  simulationParams={simulationParams}
+                  onSliderChange={onSliderChange}
+                  costBreakdown={costBreakdown}
+                  loadingSimulation={loadingSimulation}
             />
-          </div>
+              </PageTransition>
+            } 
+          />
 
-          <div className="panel">
-            <CostChart data={costBreakdown} />
-          </div>
-        </section>
+          {/* 3. Intelligence Page (Deep ML Insights) */}
+          <Route 
+            path="/forecast" 
+            element={
+              <PageTransition>
+                <Forecast />
+              </PageTransition>
+            } 
+          />
 
-        <section className="panel">
-          <ModelEvaluation />
-        </section>
+          {/* 4. Logistics Page (Route Optimizer) */}
+          <Route 
+            path="/logistics" 
+            element={
+              <PageTransition>
+                <Logistics />
+              </PageTransition>
+            } 
+          />
 
-        <section className="panel">
-          <FeatureInsights />
-        </section>
-
-        <section className="panel">
-          <MLOpsPanel
+          {/* 5. Settings/MLOps Page */}
+          <Route 
+            path="/settings" 
+            element={
+              <PageTransition>
+                <Settings
+                  modelStatus={modelStatus}
+                  modelReady={modelReady}
             onUploadSuccess={loadInitialData}
             onRetrainSuccess={handleRetrainSuccess}
-            modelStatus={modelStatus}
-            modelReady={modelReady}
           />
-        </section>
-
-        <section className="panel">
-          <RouteOptimizer />
-        </section>
-      </main>
-
-      <ToastContainer position="bottom-right" theme="dark" />
-    </div>
+              </PageTransition>
+            } 
+          />
+          
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </DashboardLayout>
+      <Toaster theme="dark" position="bottom-right" />
+    </BrowserRouter>
   );
 }
 

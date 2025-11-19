@@ -1,6 +1,5 @@
 import PropTypes from 'prop-types';
 
-import './dashboard.css';
 
 const numberFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,

@@ -118,11 +118,25 @@ def verify_api_key(api_key: str, hashed_key: str) -> bool:
     return hmac.compare_digest(hash_api_key(api_key), hashed_key)
 
 
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+) -> TokenData:
+    """Dependency to get current authenticated user from JWT token.
+    
+    Extracts client_id from token - this is the secure way to identify users.
+    Never trust client_id from request body/query params.
+    """
+    return verify_token(credentials)
+
+
 # Optional: For development/testing - allows bypassing auth
 def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(HTTPBearer(auto_error=False))
 ) -> Optional[TokenData]:
-    """Optional authentication for development."""
+    """Optional authentication for development.
+    
+    Returns None if no token provided. Use this only for development/testing.
+    """
     if credentials is None:
         return None
     try:

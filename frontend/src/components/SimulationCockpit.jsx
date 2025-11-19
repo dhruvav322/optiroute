@@ -1,8 +1,6 @@
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 
-import './simulationCockpit.css';
-
 const sliderConfig = [
   {
     key: 'order_cost',
@@ -53,18 +51,18 @@ function SimulationCockpit({ values, onChange, isRunning = false }) {
   );
 
   return (
-    <div className="cockpit" aria-busy={isRunning}>
+    <div className="flex flex-col gap-6" aria-busy={isRunning}>
       <header>
-        <h2>Simulation Cockpit</h2>
-        <p>Tweak the parameters to explore cost and risk trade-offs.</p>
+        <h2 className="text-xl font-semibold text-blue-200 mb-1">Simulation Cockpit</h2>
+        <p className="text-sm text-muted">Tweak the parameters to explore cost and risk trade-offs.</p>
       </header>
 
-      <form className="slider-grid" onSubmit={(event) => event.preventDefault()}>
+      <form className="grid grid-cols-1 md:grid-cols-2 gap-5" onSubmit={(event) => event.preventDefault()}>
         {sliders.map(({ key, label, description, min, max, step, value, format }) => (
-          <label key={key} className="slider-card">
-            <div className="slider-head">
-              <span className="slider-label">{label}</span>
-              <span className="slider-value">{format(value)}</span>
+          <label key={key} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 flex flex-col gap-3 cursor-pointer hover:border-zinc-700 transition-colors">
+            <div className="flex justify-between items-baseline text-zinc-100">
+              <span className="font-semibold text-sm">{label}</span>
+              <span className="text-xs font-mono text-zinc-400">{format(value)}</span>
             </div>
             <input
               type="range"
@@ -74,12 +72,13 @@ function SimulationCockpit({ values, onChange, isRunning = false }) {
               value={value}
               aria-label={label}
               onChange={(event) => onChange({ [key]: Number(event.target.value) })}
+              className="w-full accent-blue-500"
             />
-            <p className="slider-description">{description}</p>
+            <p className="text-xs text-muted">{description}</p>
           </label>
         ))}
       </form>
-      {isRunning && <p className="running-indicator">Recomputing optimal policy…</p>}
+      {isRunning && <p className="text-sm text-blue-400">Recomputing optimal policy…</p>}
     </div>
   );
 }

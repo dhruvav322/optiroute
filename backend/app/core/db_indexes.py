@@ -9,8 +9,12 @@ def create_indexes(db) -> None:
     """Create database indexes for optimal query performance."""
     try:
         # Historical sales indexes
-        db.historical_sales.create_index([("date", ASCENDING)], background=True)
+        # Single client_id index for queries that only filter (fastest for simple lookups)
+        db.historical_sales.create_index([("client_id", ASCENDING)], background=True)
+        # Compound index: client_id first, then date (for sorted queries per client)
+        db.historical_sales.create_index([("client_id", ASCENDING), ("date", ASCENDING)], background=True)
         db.historical_sales.create_index([("client_id", ASCENDING), ("date", DESCENDING)], background=True)
+        db.historical_sales.create_index([("date", ASCENDING)], background=True)
         db.historical_sales.create_index([("uploaded_at", DESCENDING)], background=True)
         
         # Model parameters indexes

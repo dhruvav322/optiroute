@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Sequence
 
 import numpy as np
@@ -57,7 +57,7 @@ class EvaluationService:
         train_df = frame.iloc[:-test_window]
         test_df = frame.iloc[-test_window:]
 
-        evaluated_at = datetime.utcnow()
+        evaluated_at = datetime.now(timezone.utc)
         models_section: List[_ModelEvaluation] = []
         errors: List[str] = []
 

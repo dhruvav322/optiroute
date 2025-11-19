@@ -1,11 +1,35 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+// Get JWT token from localStorage
+function getToken() {
+  return localStorage.getItem('auth_token');
+}
+
+// Store JWT token in localStorage
+function setToken(token) {
+  localStorage.setItem('auth_token', token);
+}
+
+// Remove JWT token from localStorage
+export function clearToken() {
+  localStorage.removeItem('auth_token');
+}
+
 async function request(path, options = {}) {
+  // Get token from storage and add to Authorization header
+  const token = getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  
+  // Add Authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
+    headers,
     ...options,
   });
 
@@ -13,6 +37,7 @@ async function request(path, options = {}) {
     const errorPayload = await response.json().catch(() => ({}));
     const error = new Error(errorPayload.detail || 'Request failed');
     error.status = response.status;
+    error.statusText = response.statusText;
     error.payload = errorPayload;
     throw error;
   }
@@ -24,8 +49,9 @@ async function request(path, options = {}) {
   return response.json();
 }
 
-export function getForecast(days = 30, clientId = 'default') {
-  return request(`/api/v1/forecast/current?days=${days}&client_id=${clientId}`);
+export function getForecast(days = 30) {
+  // client_id removed - now extracted from JWT token on backend
+  return request(`/api/v1/forecast/current?days=${days}`);
 }
 
 export function getInventorySummary() {
@@ -33,16 +59,20 @@ export function getInventorySummary() {
 }
 
 export function runSimulation(payload) {
+  // client_id removed from payload - now extracted from JWT token on backend
+  const { client_id, ...payloadWithoutClientId } = payload;
   return request('/api/v1/simulation/run', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payloadWithoutClientId),
   });
 }
 
-export function retrainModel(body = { client_id: 'default', train_from_uploaded_data: true, outlier_handling: 'winsorize' }) {
+export function retrainModel(body = { train_from_uploaded_data: true, outlier_handling: 'winsorize' }) {
+  // client_id removed - now extracted from JWT token on backend
+  const { client_id, ...bodyWithoutClientId } = body;
   return request('/api/v1/model/retrain', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify(bodyWithoutClientId),
   });
 }
 
@@ -50,12 +80,14 @@ export function getModelStatus() {
   return request('/api/v1/model/status');
 }
 
-export function getModelEvaluation(clientId = 'default') {
-  return request(`/api/v1/model/evaluation?client_id=${clientId}`);
+export function getModelEvaluation() {
+  // client_id removed - now extracted from JWT token on backend
+  return request('/api/v1/model/evaluation');
 }
 
-export function getFeatureAnalysis(clientId = 'default') {
-  return request(`/api/v1/features/analysis?client_id=${clientId}`);
+export function getFeatureAnalysis() {
+  // client_id removed - now extracted from JWT token on backend
+  return request('/api/v1/features/analysis');
 }
 
 export function getExperimentsHistory(limit = 20) {
@@ -86,13 +118,28 @@ export function calculateBusinessImpact(payload) {
   });
 }
 
-export async function uploadHistoricalCsv(file) {
+export async function uploadHistoricalCsv(file, columnMapping = null) {
+  // Get token from storage
+  const token = getToken();
+  
   const formData = new FormData();
   formData.append('file', file, file.name);  // Include filename explicitly
-  formData.append('client_id', 'default');  // Add required client_id
+  // client_id removed - now extracted from JWT token on backend
+  
+  // Add column mapping if provided
+  if (columnMapping) {
+    formData.append('column_mapping', JSON.stringify(columnMapping));
+  }
+
+  const headers = {};
+  // Add Authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/v1/data/upload`, {
     method: 'POST',
+    headers,
     body: formData,
     // Don't set Content-Type header - let browser set it with boundary
   });
@@ -113,4 +160,41 @@ export function optimizeRoutes(payload) {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// Authentication functions
+export async function login(userId, clientId, password = null) {
+  // Login endpoint doesn't require auth - use fetch directly instead of request()
+  const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      client_id: clientId,
+      password: password,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => ({}));
+    const error = new Error(errorPayload.detail || 'Login failed');
+    error.status = response.status;
+    error.payload = errorPayload;
+    throw error;
+  }
+
+  const data = await response.json();
+  
+  // Store token in localStorage
+  if (data.access_token) {
+    setToken(data.access_token);
+  }
+  
+  return data;
+}
+
+export async function getCurrentUser() {
+  return request('/api/v1/auth/me');
 }

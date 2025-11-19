@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
 from .api.endpoints import router as api_router
+from .api.auth import router as auth_router
 from .core.rate_limit import RateLimitMiddleware
 from .core.config import get_settings
 from .core.logging_config import setup_logging
@@ -23,7 +25,18 @@ def create_app() -> FastAPI:
             "AI-powered supply chain optimization platform providing demand forecasts, "
             "inventory optimization, route planning, and MLOps utilities."
         ),
-        version="0.2.0",
+        version="2.0.0",
+    )
+    
+    # Customize API docs with dark mode (must be added after app creation)
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        from .core.openapi_customization import get_swagger_ui_html_dark
+        return get_swagger_ui_html_dark(
+            openapi_url=app.openapi_url,
+            title=app.title + " - API Documentation",
+            swagger_js_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css",
     )
 
     # Security: Configure CORS (hardened)
@@ -46,6 +59,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],  # Allow all headers for easier setup
         expose_headers=["*"],
     )
+
+    # Performance: Add GZip compression for large JSON responses (routes/forecasts)
+    # Compresses responses by ~70%, dramatically improving load times for large datasets
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Security: Add rate limiting (optional - can disable for local dev)
     # Uncomment for production or if you want rate limiting
@@ -102,11 +119,12 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "service": "optiroute",
             "database": db_status,
-            "version": "0.2.0"
+            "version": "2.0.0"
         }
 
-    # Include router (with optional prefix for versioning)
-    app.include_router(api_router)
+    # Include routers (with optional prefix for versioning)
+    app.include_router(auth_router)  # Authentication endpoints
+    app.include_router(api_router)  # Main API endpoints
 
     return app
 
