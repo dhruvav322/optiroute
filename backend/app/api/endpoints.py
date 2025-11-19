@@ -127,7 +127,7 @@ def run_simulation(
     db.simulation_parameters.insert_one(
         {
             "client_id": client_id,  # Store client_id from token
-            "parameters": payload.dict(),
+            "parameters": payload.model_dump(),
             "forecast_days": payload.forecast_days,
             "saved_at": datetime.now(timezone.utc),
             "result": result,
@@ -303,7 +303,7 @@ def experiments_log(
     payload: ExperimentLogRequest,
     tracker: ExperimentTracker = Depends(get_experiment_tracker),
 ) -> ExperimentLogResponse:
-    experiment_id = tracker.log_experiment(payload.dict())
+    experiment_id = tracker.log_experiment(payload.model_dump())
     return ExperimentLogResponse(id=experiment_id)
 
 
@@ -358,7 +358,7 @@ def business_impact(
 ) -> BusinessImpactResponse:
     _ = db  # placeholder to keep consistency; future versions may log scenarios
     service = ImpactService()
-    result = service.calculate(payload.dict())
+    result = service.calculate(payload.model_dump())
     return BusinessImpactResponse(**result)
 
 

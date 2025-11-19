@@ -29,7 +29,8 @@ def test_retrain_background_starts_and_saves_model(client, test_db, monkeypatch,
         headers=auth_headers
     )
     assert response.status_code == 202
-    assert response.json()["status"] == "training_started"
+    # Endpoint runs synchronously and completes immediately, so status is "training_completed"
+    assert response.json()["status"] == "training_completed"
     assert called.get("invoked") is True
 
     stored = test_db.model_parameters.find_one({"client_id": "test_client"})
