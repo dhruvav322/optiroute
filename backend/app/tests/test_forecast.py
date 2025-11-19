@@ -2,14 +2,12 @@ from datetime import datetime
 
 import pandas as pd
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.services.forecast import ForecastService
 
 
 @pytest.fixture
-def client(monkeypatch):
+def mock_forecast_service(monkeypatch):
     future_dates = pd.date_range(datetime.utcnow(), periods=30, freq="D")
     forecast_df = pd.DataFrame(
         {
@@ -33,12 +31,9 @@ def client(monkeypatch):
         lambda self: {"model": DummyModel(), "model_type": "prophet"},
     )
 
-    app = create_app()
-    return TestClient(app)
 
-
-def test_forecast_endpoint_returns_30_days(client):
-    response = client.get("/forecast/current?days=30")
+def test_forecast_endpoint_returns_30_days(client, auth_headers, mock_forecast_service):
+    response = client.get("/api/v1/forecast/current?days=30", headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
     assert payload["horizon_days"] == 30

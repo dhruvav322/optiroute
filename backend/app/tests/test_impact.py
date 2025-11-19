@@ -27,14 +27,14 @@ OPTIMIZED_POLICY = {
 }
 
 
-def test_business_impact_endpoint(client):
+def test_business_impact_endpoint(client, auth_headers):
     payload = {
         "baseline": BASELINE_POLICY,
         "optimized": OPTIMIZED_POLICY,
         "implementation_cost": 25000,
     }
 
-    response = client.post("/analysis/business-impact", json=payload)
+    response = client.post("/api/v1/analysis/business-impact", json=payload, headers=auth_headers)
     assert response.status_code == 200
 
     data = response.json()
@@ -47,12 +47,12 @@ def test_business_impact_endpoint(client):
     "missing_key",
     ["baseline", "optimized"],
 )
-def test_business_impact_validation_errors(client, missing_key):
+def test_business_impact_validation_errors(client, auth_headers, missing_key):
     payload = {
         "baseline": BASELINE_POLICY,
         "optimized": OPTIMIZED_POLICY,
     }
     payload.pop(missing_key)
 
-    response = client.post("/analysis/business-impact", json=payload)
+    response = client.post("/api/v1/analysis/business-impact", json=payload, headers=auth_headers)
     assert response.status_code == 422

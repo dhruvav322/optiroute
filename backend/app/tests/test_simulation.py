@@ -5,7 +5,7 @@ import pandas as pd
 from app.services.forecast import ForecastService
 
 
-def test_simulation_run_calculates_eoq_correctly(client, monkeypatch, test_db):
+def test_simulation_run_calculates_eoq_correctly(client, monkeypatch, test_db, auth_headers):
     forecast_values = pd.DataFrame(
         {
             "ds": pd.date_range(datetime.utcnow(), periods=30, freq="D"),
@@ -30,8 +30,8 @@ def test_simulation_run_calculates_eoq_correctly(client, monkeypatch, test_db):
         "forecast_days": 30,
     }
 
-    response = client.post("/simulation/run", json=payload)
+    response = client.post("/api/v1/simulation/run", json=payload, headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["new_eoq"] == 1209
-    assert test_db.simulation_parameters.count_documents({}) == 1
+    assert test_db.simulation_parameters.count_documents({"client_id": "test_client"}) == 1

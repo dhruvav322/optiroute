@@ -71,8 +71,8 @@ def mock_feature_service(monkeypatch):
     yield
 
 
-def test_feature_analysis_endpoint_returns_insights(client):
-    response = client.get("/features/analysis")
+def test_feature_analysis_endpoint_returns_insights(client, auth_headers):
+    response = client.get("/api/v1/features/analysis", headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
     assert payload["data_points"] == 365

@@ -89,8 +89,8 @@ def mock_evaluation_service(monkeypatch):
     yield
 
 
-def test_model_evaluation_endpoint_returns_expected_payload(client):
-    response = client.get("/model/evaluation")
+def test_model_evaluation_endpoint_returns_expected_payload(client, auth_headers):
+    response = client.get("/api/v1/model/evaluation", headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
 

@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from app.api import endpoints
 from app.main import create_app
 from app.services.experiments import ExperimentTracker
+from app.core.security import create_access_token
 
 
 @pytest.fixture(autouse=True)
@@ -59,3 +60,19 @@ def app(test_db, monkeypatch):
 def client(app):
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def auth_token(override_settings):
+    """Create a test JWT token for authentication."""
+    return create_access_token(
+        user_id="test_user",
+        client_id="test_client",
+        expires_delta=None,  # Use default 24 hours
+    )
+
+
+@pytest.fixture()
+def auth_headers(auth_token):
+    """Return headers with authentication token."""
+    return {"Authorization": f"Bearer {auth_token}"}
