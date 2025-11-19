@@ -1,0 +1,54 @@
+# Code Owners Configuration
+# 
+# This file defines who owns different parts of the codebase.
+# When a pull request modifies files owned by specific teams/individuals,
+# those owners will be automatically requested as reviewers.
+#
+# To use this file:
+# 1. Copy this file to .github/CODEOWNERS (remove .example)
+# 2. Replace @team-name with actual GitHub usernames or team names
+# 3. Adjust paths and ownership as needed for your organization
+
+# Global default owners (applies to all files not explicitly owned)
+* @your-team
+
+# Backend code
+/backend/ @backend-team @devops-team
+
+# Frontend code
+/frontend/ @frontend-team @design-team
+
+# API endpoints
+/backend/app/api/ @backend-team @api-team
+
+# Core services
+/backend/app/core/ @backend-team @security-team
+
+# Database models and schemas
+/backend/app/models/ @backend-team
+/backend/app/schemas.py @backend-team
+
+# Tests
+/backend/app/tests/ @backend-team @qa-team
+/frontend/src/components/__tests__/ @frontend-team @qa-team
+
+# Configuration files
+docker-compose.yml @devops-team
+*.yml @devops-team
+*.yaml @devops-team
+
+# Documentation
+*.md @docs-team
+/docs/ @docs-team
+
+# Security and authentication
+/backend/app/core/security.py @security-team @backend-team
+/backend/app/core/api_keys.py @security-team
+/backend/app/api/auth.py @security-team @backend-team
+
+# CI/CD configuration
+/.github/ @devops-team
+
+# Scripts
+/scripts/ @devops-team @backend-team
+

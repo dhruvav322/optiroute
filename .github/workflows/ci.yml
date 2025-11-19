@@ -8,6 +8,7 @@ on:
 
 jobs:
   backend:
+    name: Backend Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,6 +26,7 @@ jobs:
         run: pytest
 
   frontend:
+    name: Frontend Tests
     runs-on: ubuntu-latest
     defaults:
       run:
