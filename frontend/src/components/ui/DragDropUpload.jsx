@@ -50,6 +50,7 @@ export function DragDropUpload({ onFileSelect }) {
     <div className="w-full">
       <label 
         htmlFor="csv-upload-input"
+        aria-label="Upload historical sales CSV"
         className={`
           flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200
           ${dragActive 

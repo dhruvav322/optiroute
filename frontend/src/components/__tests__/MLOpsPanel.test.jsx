@@ -6,12 +6,14 @@ vi.mock('../../api/client.js', () => ({
   retrainModel: vi.fn(),
 }));
 
-vi.mock('react-toastify', () => ({
+vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
-    warn: vi.fn(),
+    warning: vi.fn(),
     info: vi.fn(),
+    loading: vi.fn(),
+    dismiss: vi.fn(),
   },
 }));
 
@@ -40,10 +42,16 @@ describe('MLOpsPanel', () => {
     const file = new File(['date,quantity\n2024-01-01,10'], 'sales.csv', { type: 'text/csv' });
 
     fireEvent.change(fileInput, { target: { files: [file] } });
+    
+    // Wait for FileReader to parse CSV headers (component parses headers asynchronously)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Upload & Ingest' })).not.toBeDisabled();
+    }, { timeout: 3000 });
+
     fireEvent.click(screen.getByRole('button', { name: 'Upload & Ingest' }));
 
     await waitFor(() => {
-      // uploadHistoricalCsv is called with file and optional columnMapping (null in this test)
+      // uploadHistoricalCsv is called with file and optional columnMapping (null in this test since headers match)
       expect(uploadHistoricalCsv).toHaveBeenCalledWith(file, null);
       expect(onUploadSuccess).toHaveBeenCalled();
     });
