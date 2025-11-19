@@ -29,7 +29,7 @@ describe('MLOpsPanel', () => {
     uploadHistoricalCsv.mockResolvedValue({ status: 'uploaded', records_added: 2 });
 
     const onUploadSuccess = vi.fn();
-    render(
+    const { container } = render(
       <MLOpsPanel
         onUploadSuccess={onUploadSuccess}
         onRetrainSuccess={vi.fn()}
@@ -38,7 +38,9 @@ describe('MLOpsPanel', () => {
       />,
     );
 
-    const fileInput = screen.getByLabelText('Upload historical sales CSV');
+    // Find the file input by its id (since getByLabelText might not work with aria-label on file inputs)
+    const fileInput = container.querySelector('#csv-upload-input') || 
+                      screen.getByLabelText(/upload historical sales csv/i);
     const file = new File(['date,quantity\n2024-01-01,10'], 'sales.csv', { type: 'text/csv' });
 
     fireEvent.change(fileInput, { target: { files: [file] } });

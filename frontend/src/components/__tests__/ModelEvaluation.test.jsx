@@ -40,10 +40,13 @@ describe('ModelEvaluation', () => {
   it('renders metrics table and charts from fallback data', () => {
     render(<ModelEvaluation fallbackData={SAMPLE_DATA} />);
     expect(screen.getByText(/Model Evaluation/i)).toBeInTheDocument();
-    // Use getAllByText since "PROPHET" appears multiple times (table row and elsewhere)
+    // Check for Prophet in table (appears as "PROPHET") - use getAllByText since it appears multiple times
     const prophetElements = screen.getAllByText(/PROPHET/i);
     expect(prophetElements.length).toBeGreaterThan(0);
+    // Verify Prophet is in the model comparison table
+    expect(screen.getByRole('cell', { name: /PROPHET/i })).toBeInTheDocument();
     expect(screen.getByText(/Forecast Horizons/i)).toBeInTheDocument();
+    // Check for specific model selection reason text
     expect(screen.getByText(/Prophet leads./i)).toBeInTheDocument();
   });
 });
