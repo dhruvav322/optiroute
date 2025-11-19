@@ -60,7 +60,7 @@ export function getInventorySummary() {
 
 export function runSimulation(payload) {
   // client_id removed from payload - now extracted from JWT token on backend
-  const { client_id, ...payloadWithoutClientId } = payload;
+  const { client_id: _client_id, ...payloadWithoutClientId } = payload;
   return request('/api/v1/simulation/run', {
     method: 'POST',
     body: JSON.stringify(payloadWithoutClientId),
@@ -69,7 +69,7 @@ export function runSimulation(payload) {
 
 export function retrainModel(body = { train_from_uploaded_data: true, outlier_handling: 'winsorize' }) {
   // client_id removed - now extracted from JWT token on backend
-  const { client_id, ...bodyWithoutClientId } = body;
+  const { client_id: _client_id, ...bodyWithoutClientId } = body;
   return request('/api/v1/model/retrain', {
     method: 'POST',
     body: JSON.stringify(bodyWithoutClientId),
