@@ -40,7 +40,9 @@ describe('ModelEvaluation', () => {
   it('renders metrics table and charts from fallback data', () => {
     render(<ModelEvaluation fallbackData={SAMPLE_DATA} />);
     expect(screen.getByText(/Model Evaluation/i)).toBeInTheDocument();
-    expect(screen.getByText(/PROPhet/i)).toBeInTheDocument();
+    // Use getAllByText since "PROPHET" appears multiple times (table row and elsewhere)
+    const prophetElements = screen.getAllByText(/PROPHET/i);
+    expect(prophetElements.length).toBeGreaterThan(0);
     expect(screen.getByText(/Forecast Horizons/i)).toBeInTheDocument();
     expect(screen.getByText(/Prophet leads./i)).toBeInTheDocument();
   });

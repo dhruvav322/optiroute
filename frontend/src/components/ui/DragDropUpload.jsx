@@ -49,6 +49,7 @@ export function DragDropUpload({ onFileSelect }) {
   return (
     <div className="w-full">
       <label 
+        htmlFor="csv-upload-input"
         className={`
           flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200
           ${dragActive 
@@ -61,6 +62,7 @@ export function DragDropUpload({ onFileSelect }) {
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
+        <span className="sr-only">Upload historical sales CSV</span>
         <div className="flex flex-col items-center justify-center pt-5 pb-6">
           {selectedFile ? (
             <div className="flex flex-col items-center">
@@ -87,7 +89,7 @@ export function DragDropUpload({ onFileSelect }) {
             </>
           )}
         </div>
-        <input type="file" className="hidden" accept=".csv" onChange={handleChange} />
+        <input id="csv-upload-input" type="file" className="hidden" accept=".csv" onChange={handleChange} aria-label="Upload historical sales CSV" />
       </label>
     </div>
   );

@@ -43,13 +43,14 @@ describe('MLOpsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Upload & Ingest' }));
 
     await waitFor(() => {
-      expect(uploadHistoricalCsv).toHaveBeenCalledWith(file);
+      // uploadHistoricalCsv is called with file and optional columnMapping (null in this test)
+      expect(uploadHistoricalCsv).toHaveBeenCalledWith(file, null);
       expect(onUploadSuccess).toHaveBeenCalled();
     });
   });
 
   it('triggers retrain on button click', async () => {
-    retrainModel.mockResolvedValue({ status: 'training_started' });
+    retrainModel.mockResolvedValue({ status: 'training_completed' });
 
     const onRetrainSuccess = vi.fn();
     render(
@@ -64,7 +65,11 @@ describe('MLOpsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retrain Forecast Model' }));
 
     await waitFor(() => {
-      expect(retrainModel).toHaveBeenCalledWith({ train_from_uploaded_data: true });
+      // Component calls retrainModel with both train_from_uploaded_data and outlier_handling (default: 'winsorize')
+      expect(retrainModel).toHaveBeenCalledWith({ 
+        train_from_uploaded_data: true,
+        outlier_handling: 'winsorize' 
+      });
       expect(onRetrainSuccess).toHaveBeenCalled();
     });
   });
