@@ -172,6 +172,7 @@ def retrain_model(
         retrain_output = forecast_service.retrain_model(
             frame[["ds", "y"]], outlier_handling=request.outlier_handling
         )
+        forecast_service.invalidate_cached_forecasts()
         cleaned_frame = retrain_output["cleaned_frame"]
         training_result = {
             "metrics": retrain_output["metrics"],
@@ -354,8 +355,10 @@ def experiments_best(
 )
 def business_impact(
     payload: BusinessImpactRequest,
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> BusinessImpactResponse:
+    _ = current_user
     _ = db  # placeholder to keep consistency; future versions may log scenarios
     service = ImpactService()
     result = service.calculate(payload.model_dump())
@@ -546,6 +549,7 @@ async def upload_data(
 
     if records:
         db.historical_sales.insert_many(records)
+        ForecastService(client_id).invalidate_cached_forecasts()
 
     try:
         upload_path.unlink(missing_ok=True)
@@ -600,6 +604,7 @@ def model_status(
 )
 def optimize_routes(
     payload: RouteOptimizationRequest,
+    current_user: TokenData = Depends(get_current_user),
     db=Depends(get_db),
 ) -> RouteOptimizationResponse:
     """Optimize routes for given locations.
@@ -610,6 +615,13 @@ def optimize_routes(
     """
     # Security: Validate input
     validate_locations_count(payload.locations)
+    if not 0 <= payload.depot_index < len(payload.locations):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="depot_index must refer to one of the supplied locations",
+        )
+    _ = current_user
+    _ = db
     
     service = RouteOptimizationService()
     

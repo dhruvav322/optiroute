@@ -263,7 +263,10 @@ Continuous integration runs these commands automatically via `.github/workflows/
 | `MONGO_DB`    | Backend   | `optiroute`             | Database name                                   |
 | `MODEL_PATH`  | Backend   | `models/model.pkl`      | Location of persisted forecast model            |
 | `MODEL_DIR`   | Backend   | `models`                | Directory for model artifacts                   |
-| `SECRET_KEY`  | Backend   | `insecure-secret`       | **Change this in production!** JWT signing key  |
+| `ENVIRONMENT` | Backend   | `development`           | Set `production` or `staging` for deployed environments |
+| `SECRET_KEY`  | Backend   | development only        | Required: unique 32+ character JWT signing key in production |
+| `ALLOWED_ORIGINS` | Backend | none | Required comma-separated browser origins in production |
+| `RATE_LIMIT_PER_MINUTE` | Backend | `60` | Baseline per-IP API request limit |
 | `VITE_API_BASE_URL` | Frontend | `http://localhost:8000`     | Base URL for API calls                           |
 | `OSRM_URL`    | Backend   | `http://router.project-osrm.org` | OSRM routing service URL (optional)      |
 

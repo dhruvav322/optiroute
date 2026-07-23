@@ -187,17 +187,21 @@ class RouteOptimizationService:
         # Calculate distance matrix
         distance_matrix = self.calculate_distance_matrix(locations)
         
-        # Create routing model
-        # Note: OR-Tools always returns to depot by default. For open TSP (return_to_depot=False),
-        # we'll handle this in route extraction by not adding the final depot node.
-        manager = pywrapcp.RoutingIndexManager(
-            len(locations), 1, depot_index
+        # An open route needs a virtual zero-cost sink. Simply hiding the final
+        # depot in a closed solution would retain its return leg in the cost.
+        virtual_end = len(locations) if not return_to_depot else None
+        manager = (
+            pywrapcp.RoutingIndexManager(len(locations), 1, depot_index)
+            if return_to_depot
+            else pywrapcp.RoutingIndexManager(len(locations) + 1, 1, [depot_index], [virtual_end])
         )
         routing = pywrapcp.RoutingModel(manager)
 
         def distance_callback(from_index, to_index):
             from_node = manager.IndexToNode(from_index)
             to_node = manager.IndexToNode(to_index)
+            if virtual_end is not None and (from_node == virtual_end or to_node == virtual_end):
+                return 0
             return distance_matrix[from_node][to_node]
 
         transit_callback_index = routing.RegisterTransitCallback(distance_callback)
@@ -243,10 +247,6 @@ class RouteOptimizationService:
         if return_to_depot:
             route.append(locations[final_node])
             route_indices.append(final_node)
-        else:
-            # For open TSP, the route ends at the last stop (driver can end shift there)
-            # The final distance is already included in total_distance
-            pass
 
         return {
             "route": [
@@ -261,7 +261,7 @@ class RouteOptimizationService:
             ],
             "total_distance_meters": total_distance,
             "total_distance_km": round(total_distance / 1000, 2),
-            "number_of_stops": len(route) - (1 if return_to_depot else 0),  # Exclude return to depot if applicable
+            "number_of_stops": len(route) - (2 if return_to_depot else 1),
             "route_indices": route_indices,
             "return_to_depot": return_to_depot
         }
@@ -301,23 +301,35 @@ class RouteOptimizationService:
         # Get demands (capacity requirements)
         demands = [int(loc.demand * 100) for loc in locations]  # Convert to integer units
         
-        # Create routing model
-        manager = pywrapcp.RoutingIndexManager(
-            len(locations), len(vehicles), depot_index
+        # A virtual zero-cost sink gives open routes an actual open endpoint.
+        virtual_end = len(locations) if not return_to_depot else None
+        manager = (
+            pywrapcp.RoutingIndexManager(len(locations), len(vehicles), depot_index)
+            if return_to_depot
+            else pywrapcp.RoutingIndexManager(
+                len(locations) + 1,
+                len(vehicles),
+                [depot_index] * len(vehicles),
+                [virtual_end] * len(vehicles),
+            )
         )
         routing = pywrapcp.RoutingModel(manager)
 
         def distance_callback(from_index, to_index):
             from_node = manager.IndexToNode(from_index)
             to_node = manager.IndexToNode(to_index)
+            if virtual_end is not None and (from_node == virtual_end or to_node == virtual_end):
+                return 0
             return distance_matrix[from_node][to_node]
 
         def demand_callback(from_index):
             from_node = manager.IndexToNode(from_index)
+            if virtual_end is not None and from_node == virtual_end:
+                return 0
             return demands[from_node]
 
         transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-        demand_callback_index = routing.RegisterUnaryCallback(demand_callback)
+        demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
         
         routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
         routing.AddDimensionWithVehicleCapacity(
@@ -372,11 +384,9 @@ class RouteOptimizationService:
             if return_to_depot:
                 route.append(locations[final_node])
                 route_indices.append(final_node)
-            else:
-                # For open VRP, routes end at last stop (driver can end shift there)
-                pass
             
-            if len(route) > 2:  # Only include routes with actual stops
+            minimum_route_nodes = 2 if return_to_depot else 1
+            if len(route) > minimum_route_nodes:  # Only include routes with actual stops
                 vehicle_routes.append({
                     "vehicle_id": vehicles[vehicle_id].id,
                     "route": [
@@ -405,4 +415,3 @@ class RouteOptimizationService:
             "total_vehicles": len(vehicles),
             "return_to_depot": return_to_depot
         }
-

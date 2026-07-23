@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from pymongo import MongoClient
 from pymongo.database import Database
 
@@ -31,6 +33,7 @@ class MongoDB:
     def db(self) -> Database:
         return self._db
 
+@lru_cache
 def get_mongo() -> MongoDB:
     settings = get_settings()
     return MongoDB(str(settings.mongo_uri), settings.mongo_db)

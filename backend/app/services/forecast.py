@@ -95,6 +95,13 @@ class ForecastService:
         
         return forecast_df
 
+    def invalidate_cached_forecasts(self, max_horizon_days: int = 180) -> None:
+        """Remove cached forecasts after the tenant's model or data changes."""
+        from ..core.cache import cache
+
+        for horizon_days in range(1, max_horizon_days + 1):
+            cache.delete(f"forecast:{self._client_id}:{horizon_days}")
+
     @staticmethod
     def summarize_forecast(values: Iterable[float]) -> dict[str, float]:
         arr = np.array(list(values), dtype=float)

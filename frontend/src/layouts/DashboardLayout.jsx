@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Truck, TrendingUp, Sliders, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Sliders, Settings, Zap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { CommandMenu } from '../components/ui/CommandMenu.jsx';
@@ -27,14 +27,13 @@ export default function DashboardLayout({ children, onRunSimulation }) {
           </div>
 
           <nav className="flex-1 py-6 flex flex-col gap-2 px-2">
-            <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Overview" />
-            <NavItem to="/planning" icon={<Sliders size={20} />} label="Planning & Sim" />
-            <NavItem to="/forecast" icon={<TrendingUp size={20} />} label="Intelligence" />
-            <NavItem to="/logistics" icon={<Truck size={20} />} label="Logistics" />
+            <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Decision Center" />
+            <NavItem to="/planning" icon={<Sliders size={20} />} label="Planning" />
+            <NavItem to="/forecast" icon={<TrendingUp size={20} />} label="Data & Forecast" />
           </nav>
 
           <div className="p-2 border-t border-border">
-            <NavItem to="/settings" icon={<Settings size={20} />} label="MLOps & Data" />
+            <NavItem to="/settings" icon={<Settings size={20} />} label="Administration" />
           </div>
         </aside>
 
@@ -84,4 +83,3 @@ function NavItem({ icon, label, to }) {
     </NavLink>
   );
 }
-
