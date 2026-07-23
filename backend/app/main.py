@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    settings.validate_production_security()
     
     app = FastAPI(
         title="Optiroute — Supply Chain Optimization",
@@ -64,9 +65,12 @@ def create_app() -> FastAPI:
     # Compresses responses by ~70%, dramatically improving load times for large datasets
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # Security: Add rate limiting (optional - can disable for local dev)
-    # Uncomment for production or if you want rate limiting
-    # app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+    # Apply a baseline per-IP limit. Production instances may override this
+    # through RATE_LIMIT_PER_MINUTE and should use an edge/distributed limiter.
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=getattr(settings, "rate_limit_per_minute", 60),
+    )
 
     # Monitoring: Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Toaster, toast } from 'sonner';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
@@ -10,12 +10,13 @@ import { RouteProgress } from './components/RouteProgress.jsx';
 import { GlobalHotkeys } from './components/GlobalHotkeys.jsx';
 import PageTransition from './components/PageTransition.jsx';
 
-// Pages
-import Overview from './pages/Overview.jsx';
-import Planning from './pages/Planning.jsx';
-import Forecast from './pages/Forecast.jsx';
-import Logistics from './pages/Logistics.jsx';
-import Settings from './pages/Settings.jsx';
+// Load product areas only when the user navigates to them. This keeps the
+// initial decision workflow independent from heavy analytics and map modules.
+const Overview = lazy(() => import('./pages/Overview.jsx'));
+const Planning = lazy(() => import('./pages/Planning.jsx'));
+const Forecast = lazy(() => import('./pages/Forecast.jsx'));
+const Logistics = lazy(() => import('./pages/Logistics.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 // API
 import {
@@ -124,7 +125,7 @@ function App() {
       // Check if we already have a token
       const existingToken = localStorage.getItem('auth_token');
       
-      if (!existingToken) {
+      if (!existingToken && import.meta.env.DEV) {
         // Auto-login with default credentials for development
         // In production, users would log in through a login page
         try {
@@ -140,8 +141,16 @@ function App() {
         }
       }
       
+      if (!existingToken && !import.meta.env.DEV) {
+        setLoading(false);
+        toast.error('Authentication is required', {
+          description: 'Sign in must be configured before using this deployment.',
+        });
+        return;
+      }
+
       // Load data after authentication
-    loadInitialData();
+      loadInitialData();
     };
     
     initializeAuth();
@@ -239,7 +248,8 @@ function App() {
       <RouteProgress />
       <GlobalHotkeys onRunSimulation={() => runSimulationWithParams(simulationParams)} />
       <DashboardLayout onRunSimulation={() => runSimulationWithParams(simulationParams)}>
-        <Routes>
+        <Suspense fallback={<div className="py-20 text-center text-sm text-muted">Loading workspace…</div>}>
+          <Routes>
           {/* 1. Overview Page */}
           <Route 
             path="/" 
@@ -308,7 +318,8 @@ function App() {
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </DashboardLayout>
       <Toaster theme="dark" position="bottom-right" />
     </BrowserRouter>

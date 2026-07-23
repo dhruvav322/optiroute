@@ -41,11 +41,15 @@ def login(request: LoginRequest) -> LoginResponse:
     For development/testing: Accepts user_id and client_id directly.
     In production, this should validate credentials against a user database.
     """
-    # For development: Simple token generation
-    # In production, validate credentials here:
-    # - Check user exists in database
-    # - Verify password hash
-    # - Derive client_id from user_id or user's organization
+    settings = get_settings()
+    if settings.environment.lower() not in {"development", "test", "testing"}:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Password login is disabled outside development. Configure a production identity provider.",
+        )
+
+    # Development-only token generation. A production identity provider must
+    # validate credentials and derive the tenant from the authenticated user.
     
     if not request.user_id or not request.client_id:
         raise HTTPException(
@@ -77,4 +81,3 @@ def get_current_user_info(
 ) -> TokenData:
     """Get information about the currently authenticated user."""
     return current_user
-

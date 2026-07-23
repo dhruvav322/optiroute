@@ -24,24 +24,12 @@
 - ✅ Rate limiting active
 - ✅ Full validation
 
-## Current Setup (Simplified)
+## Current authentication setup
 
-The API is already set up to work without authentication by default:
-
-```python
-# In backend/app/core/config.py
-enable_auth: bool = Field(default=False, env="ENABLE_AUTH")  # Set to False = no auth required
-```
-
-**For a portfolio/demo project:**
-- Keep `ENABLE_AUTH=false` (default)
-- The API works without authentication
-- All endpoints are accessible
-- Perfect for showcasing your work
-
-**For production:**
-- Set `ENABLE_AUTH=true`
-- Add authentication to protect your API
+Development may issue local test JWTs so the sample frontend can run. Production
+password login is deliberately disabled until a real identity provider is
+configured; arbitrary user and tenant identifiers must never mint production
+tokens. Protected API routes require a bearer token in every environment.
 
 ## What's Actually Required
 
@@ -50,15 +38,15 @@ enable_auth: bool = Field(default=False, env="ENABLE_AUTH")  # Set to False = no
 2. **Basic validation** - Prevents crashes from bad input
 3. **Error handling** - Better user experience
 
-### ⚠️ Optional (Can Disable):
-1. **Authentication** - Disabled by default (`ENABLE_AUTH=false`)
-2. **Rate limiting** - Commented out in main.py (can uncomment if needed)
-3. **Advanced security** - Nice to have, not required for demo
+### ⚠️ Environment-dependent:
+1. **Development login** - local-only convenience for the demo frontend
+2. **Production identity provider** - required before deploying user access
+3. **Distributed rate limiting** - recommended when running multiple API instances
 
 ### 🎯 Recommended for Portfolio:
 - Keep the API structure (it's professional)
 - Keep basic validation (shows good practices)
-- Disable authentication (easier to demo)
+- Use local development authentication only; never deploy it
 - Keep file upload security (shows security awareness)
 
 ## Quick Start (Simplified)
@@ -108,4 +96,3 @@ The API structure you have is actually a **strength** for your portfolio - it sh
 - REST API design
 - Separation of concerns
 - Professional architecture
-
